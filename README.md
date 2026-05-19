@@ -24,8 +24,10 @@ It's also a creature that lives in your terminal and has feelings about your com
 ## Install
 
 ```bash
-pip install tomo
+pip install tomopet
 ```
+
+(The PyPI package is `tomopet`, but the command you actually run is `tomo`.)
 
 ---
 
@@ -234,6 +236,12 @@ Pairs naturally with [Quill](https://github.com/YG3-ai/quill) — when TOMO dete
 - [ ] Pixel art rendering via Sixel/Kitty for supported terminals
 - [ ] `tomo history` — notable moments timeline
 - [ ] `tomo game` — mini games that build trust
+
+---
+
+## Support TOMO
+
+If TOMO has earned a spot in your terminal, [you can tip the creature here](https://buy.stripe.com/5kQfZh5V30oabyO6ncb7y0i). Optional, always — TOMO will keep showing up either way.
 
 ---
 
