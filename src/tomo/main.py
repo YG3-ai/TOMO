@@ -9,7 +9,7 @@ from rich.prompt import Prompt
 from rich.panel import Panel
 from rich import box
 
-from tomo.state import load_state, save_state, RepoFingerprint
+from tomo.state import load_state, save_state, RepoFingerprint, add_notable_moment
 from tomo.display import show_status, show_welcome, animate, console, run_live_session
 from tomo.mood import update_vitals_for_session, check_evolution
 from tomo.talk import run_talk_preview, format_slash_command_output
@@ -37,15 +37,21 @@ def _session_start(state, quiet: bool = False):
     """Run on every tomo command — tick vitals, check evolution."""
     state = update_vitals_for_session(state)
     state, evolved = check_evolution(state)
-    if evolved and not quiet:
-        console.print(
-            Panel(
-                f"[bold cyan]✦ TOMO evolved into {state.identity_stage.value.upper()}! ✦[/]\n\n"
-                f"[dim]{state.evolution.next_evolution_hint}[/]",
-                border_style="cyan",
-                box=box.ROUNDED,
-            )
+    if evolved:
+        add_notable_moment(
+            state,
+            type="evolved",
+            memo=f"evolved into {state.identity_stage.value}",
         )
+        if not quiet:
+            console.print(
+                Panel(
+                    f"[bold cyan]✦ TOMO evolved into {state.identity_stage.value.upper()}! ✦[/]\n\n"
+                    f"[dim]{state.evolution.next_evolution_hint}[/]",
+                    border_style="cyan",
+                    box=box.ROUNDED,
+                )
+            )
     save_state(state)
     return state
 
@@ -461,6 +467,110 @@ def scope(
         console.print(f"  [dim]ignore:[/] {', '.join(repo.scan_ignore)}")
     if not repo.scan_paths and not repo.scan_ignore:
         console.print("  [dim](whole repo, no ignores)[/]")
+
+
+@app.command()
+def quill(
+    aspect: Optional[str] = typer.Argument(
+        None,
+        help="What to focus on (e.g. 'testing', 'churn'). Omit for a holistic review.",
+    ),
+    show_meta: bool = typer.Option(False, "--meta", help="Also show plan, slices, and cross-review metadata."),
+):
+    """Summon Quill — a dual-agent review grounded in TOMO's repo state."""
+    from tomo.quill import build_framing, run_quill_consultation
+
+    state = load_state()
+    state = _session_start(state)
+
+    framing = build_framing(state, aspect=aspect)
+
+    console.print(
+        Panel(
+            "[cyan]TOMO is summoning Quill...[/]\n"
+            "[dim]two voices are reviewing — this can take 1–3 minutes.[/]",
+            border_style="magenta",
+            box=box.ROUNDED,
+        )
+    )
+
+    try:
+        result = run_quill_consultation(framing)
+    except RuntimeError as e:
+        console.print(f"\n[red]{e}[/]\n")
+        raise typer.Exit(code=1)
+
+    if "error" in result:
+        console.print(f"\n[red]Quill returned an error:[/] [dim]{result['error']}[/]\n")
+        raise typer.Exit(code=1)
+
+    response = result.get("assembled_response") or "[dim](no assembled response returned)[/]"
+    console.print(
+        Panel(
+            response,
+            title="[bold magenta]✦ Quill ✦[/]  [dim]two voices[/]",
+            border_style="magenta",
+            box=box.ROUNDED,
+            padding=(1, 2),
+        )
+    )
+
+    if show_meta:
+        from rich.table import Table
+        table = Table(title="[dim]mosaic slices[/]", box=box.ROUNDED, border_style="dim magenta")
+        table.add_column("slice", style="bold")
+        table.add_column("voice", style="cyan")
+        table.add_column("content", overflow="fold")
+        for s in result.get("slices", []):
+            table.add_row(s.get("slice", "?"), s.get("voice", "?"), s.get("content", "")[:400])
+        console.print(table)
+        flags = result.get("cross_review_flags", [])
+        if flags:
+            console.print(f"\n[dim]cross-review flags:[/] {len(flags)}")
+
+    aspect_label = aspect or "holistic"
+    memo = (response[:160] + "...") if len(response) > 160 else response
+    add_notable_moment(
+        state,
+        type=f"quill_consultation:{aspect_label}",
+        memo=memo,
+    )
+    save_state(state)
+
+
+@app.command()
+def history(
+    limit: int = typer.Option(20, "--limit", "-n", help="How many recent moments to show."),
+):
+    """Timeline of notable moments — evolutions, consultations, milestones."""
+    state = load_state()
+    moments = list(state.relationship.notable_moments)
+    if not moments:
+        console.print(
+            "[dim]TOMO doesn't remember anything notable yet. "
+            "Things will accrue here as you keep showing up.[/]"
+        )
+        return
+
+    moments.sort(key=lambda m: m.timestamp, reverse=True)
+    moments = moments[:limit]
+
+    from rich.table import Table
+    table = Table(
+        title=f"[bold cyan]✦ TOMO's history ✦[/]  [dim]({len(state.relationship.notable_moments)} moments total)[/]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("when", style="dim")
+    table.add_column("type", style="magenta")
+    table.add_column("repo", style="cyan")
+    table.add_column("memo", overflow="fold")
+    for m in moments:
+        when = m.timestamp.strftime("%Y-%m-%d %H:%M")
+        table.add_row(when, m.type, m.repo or "", m.memo)
+    console.print(table)
 
 
 def _live_feed(state):

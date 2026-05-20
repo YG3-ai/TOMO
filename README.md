@@ -24,7 +24,8 @@ It's also a creature that lives in your terminal and has feelings about your com
 ## Install
 
 ```bash
-pip install tomopet
+pip install tomopet                # core
+pip install 'tomopet[quill]'       # + dual-agent review (needs claude+codex CLIs)
 ```
 
 (The PyPI package is `tomopet`, but the command you actually run is `tomo`.)
@@ -91,7 +92,35 @@ tomo feed                     # feed TOMO
 tomo play                     # play with TOMO (boosts happiness + trust)
 tomo talk                     # see what TOMO is thinking (preview mode)
 tomo talk --raw "msg"         # raw output for piping to any AI
+tomo quill [aspect]           # summon Quill — two AIs review your repo state
+tomo quill --meta             # also show the mosaic slices and cross-review
+tomo history                  # timeline of evolutions, consultations, milestones
 ```
+
+---
+
+## Summoning Quill
+
+When you want a deeper read than TOMO can give you on his own, summon
+[Quill](https://github.com/YG3-ai/quill) — a sister project that runs two AI
+agents (Claude + Codex) in parallel on the same problem and surfaces the seams
+between them instead of homogenizing them.
+
+```bash
+pip install 'tomopet[quill]'   # one-time
+tomo quill                     # holistic dual-agent review
+tomo quill testing             # focus on a specific aspect
+tomo quill churn --meta        # also show the mosaic plan + slices
+```
+
+TOMO builds the framing automatically from its real state — vitals,
+relationship pattern, scoped repo fingerprints — and asks Quill for two
+voices. Each consultation is saved to `tomo history` so the seams stay
+inspectable later. Requires both `claude` and `codex` CLIs installed and
+logged in.
+
+> "Two heads are better than one." A single AI smooths things over by
+> instinct. Two AIs disagreeing in writing is signal you can act on.
 
 ---
 
@@ -231,10 +260,11 @@ Pairs naturally with [Quill](https://github.com/YG3-ai/quill) — when TOMO dete
 - [x] `tomo scan` — real repo health analysis (test discipline, churn, commit hygiene, chaos)
 - [x] `tomo live` — persistent body-double window with mouse clicks + auto-scan
 - [x] Scoping — `--only` / `--ignore` for noisy repos
-- [ ] Quill integration — TOMO summons a second opinion on bad health signals
+- [x] Quill integration — `tomo quill` summons a dual-agent second opinion
+- [x] `tomo history` — notable moments timeline
 - [ ] Secret detection in scan
+- [ ] Auto-consult Quill in `tomo live` when chaos crosses a threshold
 - [ ] Pixel art rendering via Sixel/Kitty for supported terminals
-- [ ] `tomo history` — notable moments timeline
 - [ ] `tomo game` — mini games that build trust
 
 ---

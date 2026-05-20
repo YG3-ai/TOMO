@@ -452,6 +452,12 @@ def run_live_session(
                     if tick % EVOLUTION_CHECK_TICKS == 0:
                         state, evolved = check_evolution(state)
                         if evolved:
+                            from tomo.state import add_notable_moment
+                            add_notable_moment(
+                                state,
+                                type="evolved",
+                                memo=f"evolved into {state.identity_stage.value} during a live session",
+                            )
                             save_fn(state)
                             frames = SPRITES.get(state.identity_stage, SPRITES[Stage.EGG])
                             celebrating = True

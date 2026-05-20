@@ -123,6 +123,18 @@ def save_state(state: TomoState) -> None:
         f.write(state.model_dump_json(indent=2))
 
 
+def add_notable_moment(state: TomoState, type: str, memo: str, repo: str = "") -> None:
+    """Append a NotableMoment to TOMO's relationship history. Caller saves."""
+    state.relationship.notable_moments.append(
+        NotableMoment(
+            timestamp=datetime.now(timezone.utc),
+            repo=repo,
+            type=type,
+            memo=memo,
+        )
+    )
+
+
 def load_repo_health(slug: str) -> dict:
     path = REPOS_DIR / f"{slug}.json"
     if not path.exists():

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tomopet"
-version = "0.1.0"
+version = "0.2.0"
 description = "TOMO — the electric pet that lives in your repos and judges your code (affectionately)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -32,6 +32,9 @@ dependencies = [
     "gitpython>=3.1",
     "pydantic>=2.0",
 ]
+
+[project.optional-dependencies]
+quill = ["quill-mcp>=0.2"]
 
 [project.scripts]
 tomo = "tomo.main:app"
