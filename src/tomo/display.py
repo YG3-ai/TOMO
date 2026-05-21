@@ -264,7 +264,6 @@ def run_live_session(
     """
     import sys
     import os
-    import fcntl
     import select
     import termios
     import tty
@@ -380,24 +379,45 @@ def run_live_session(
         return Group(main, footer)
 
     fd = sys.stdin.fileno()
+    stdout_fd = sys.stdout.fileno()
     old_settings = termios.tcgetattr(fd)
-    old_flags = fcntl.fcntl(fd, fcntl.F_GETFL)
     mouse_enabled = False
+    # Note: we intentionally do NOT set O_NONBLOCK on stdin. On macOS,
+    # stdin/stdout/stderr share an open file description when connected to
+    # a TTY, so O_NONBLOCK on stdin would also make stdout non-blocking and
+    # Rich's Live frame writes would fail with BlockingIOError. select+cbreak
+    # is enough: select gates the read, cbreak makes os.read return as soon
+    # as one byte is available.
+
+    # Bypass Python-level buffering so cleanup escape codes always reach the
+    # terminal — Rich's Live may otherwise swallow writes to sys.stdout.
+    def _write_term(seq: bytes) -> None:
+        try:
+            os.write(stdout_fd, seq)
+        except OSError:
+            pass
+
+    def _safe_view():
+        try:
+            return view()
+        except Exception:
+            # If markup ever breaks (e.g. a repo nickname with [brackets]),
+            # fall back to a plain text panel so the loop doesn't crash.
+            return Panel("[dim]TOMO is having a moment...[/]", border_style="red")
+
     try:
         tty.setcbreak(fd)
-        fcntl.fcntl(fd, fcntl.F_SETFL, old_flags | os.O_NONBLOCK)
         # Enable SGR mouse reporting (button presses, decimal column/row).
-        sys.stdout.write("\x1b[?1000h\x1b[?1006h")
-        sys.stdout.flush()
+        _write_term(b"\x1b[?1000h\x1b[?1006h")
         mouse_enabled = True
 
         if SCAN_TICKS:
             _kick_off_scan()
 
-        with Live(view(), console=console, refresh_per_second=FPS, screen=True) as live:
+        with Live(_safe_view(), console=console, refresh_per_second=FPS, screen=True) as live:
             while True:
-                r, _, _ = select.select([sys.stdin], [], [], 1.0 / FPS)
-                if r:
+                read_ready, _, _ = select.select([sys.stdin], [], [], 1.0 / FPS)
+                if read_ready:
                     try:
                         chunk = os.read(fd, 1024).decode("utf-8", errors="replace")
                     except (BlockingIOError, OSError):
@@ -490,13 +510,36 @@ def run_live_session(
                         # Refresh the quip rotation so any new concerns surface soon
                         current_quip = _pick_live_quip(state)
 
-                live.update(view())
+                live.update(_safe_view())
     except KeyboardInterrupt:
         pass
+    except Exception:
+        # Log the real failure so we can see it after cleanup. Without this
+        # the bulletproof reset hides what actually went wrong.
+        try:
+            import traceback
+            from pathlib import Path as _Path
+            log_path = _Path.home() / ".tomo" / "live-error.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(log_path, "a") as f:
+                from datetime import datetime as _dt
+                f.write(f"\n=== {_dt.now().isoformat()} ===\n")
+                traceback.print_exc(file=f)
+        except Exception:
+            pass
+        raise
     finally:
+        # Bulletproof terminal reset. Each step is independently guarded so
+        # one failure can't suppress the rest.
         if mouse_enabled:
-            sys.stdout.write("\x1b[?1000l\x1b[?1006l")
-            sys.stdout.flush()
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        fcntl.fcntl(fd, fcntl.F_SETFL, old_flags)
-        save_fn(state)
+            _write_term(b"\x1b[?1000l\x1b[?1006l")
+        # Leave alt screen + show cursor in case Live's own cleanup didn't run
+        _write_term(b"\x1b[?1049l\x1b[?25h")
+        try:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        except Exception:
+            pass
+        try:
+            save_fn(state)
+        except Exception:
+            pass

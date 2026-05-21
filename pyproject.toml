@@ -10,7 +10,13 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 authors = [{ name = "YG3" }]
-keywords = ["cli", "terminal", "pet", "tamagotchi", "developer-tools", "ai"]
+keywords = [
+    "cli", "terminal", "tui", "rich",
+    "pet", "tamagotchi", "virtual-pet", "terminal-pet",
+    "developer-tools", "developer-experience", "coding-companion",
+    "body-double", "adhd", "focus",
+    "code-health", "git", "ai",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -35,6 +41,11 @@ dependencies = [
 
 [project.optional-dependencies]
 quill = ["quill-mcp>=0.2"]
+
+[project.urls]
+Homepage = "https://github.com/YG3-ai/TOMO"
+Repository = "https://github.com/YG3-ai/TOMO"
+Issues = "https://github.com/YG3-ai/TOMO/issues"
 
 [project.scripts]
 tomo = "tomo.main:app"
